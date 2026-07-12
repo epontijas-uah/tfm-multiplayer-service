@@ -43,7 +43,10 @@ jobs:
       - name: Run Docker container
         shell: powershell
         run: |
-          $null = docker rm -f multiplayer-service 2>$null
+          $containerExists = docker ps -a --filter "name=^/multiplayer-service$" --format "{{.Names}}"
+          if ($containerExists) {
+            docker rm -f multiplayer-service *> $null
+          }
           docker run -d --name multiplayer-service -p 4000:4000 multiplayer-service:${{ github.sha }}
 
       - name: Verify deployment
