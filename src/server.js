@@ -1,23 +1,48 @@
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const cors = require('cors');
-require('dotenv').config();
+const express = require("express");
+const http = require("http");
+const cors = require("cors");
+require("dotenv").config();
 
-const { initGameSocket } = require('./socket/gameSocket');
+const { Server } = require("socket.io");
+const { initMultiplayerSocket } = require("./socket/gameSocket");
 
 const app = express();
-app.use(cors());
+
+app.use(cors({
+  origin: process.env.FRONTEND_URL || "*",
+  credentials: true
+}));
+
 app.use(express.json());
 
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
-
-const httpServer = http.createServer(app);
-const io = new Server(httpServer, {
-  cors: { origin: '*' }
+app.get("/", (req, res) => {
+  res.json({
+    service: "multiplayer-service",
+    status: "running"
+  });
 });
 
-initGameSocket(io);
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    service: "multiplayer-service"
+  });
+});
+
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL || "*",
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
+
+initMultiplayerSocket(io);
 
 const PORT = process.env.PORT || 4000;
-httpServer.listen(PORT, () => console.log(`game-service running on port ${PORT}`));
+
+server.listen(PORT, () => {
+  console.log(`multiplayer-service running on http://localhost:${PORT}`);
+});
