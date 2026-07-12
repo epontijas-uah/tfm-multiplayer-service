@@ -4,51 +4,62 @@ const cors = require("cors");
 const { Server } = require("socket.io");
 require("dotenv").config();
 
-const { initMultiplayerSocket } = require("./socket/multiplayerSocket");
+const { initMultiplayerSocket } = require("./socket/gameSocket");
 
-const app = express();
-const FRONTEND_URL = "http://localhost:5173";
+function createServer() {
+  const app = express();
+  const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
-app.use(
-  cors({
-    origin: FRONTEND_URL,
-    methods: ["GET", "POST"],
-    credentials: true
-  })
-);
+  app.use(
+    cors({
+      origin: FRONTEND_URL,
+      methods: ["GET", "POST"],
+      credentials: true
+    })
+  );
 
-app.use(express.json());
+  app.use(express.json());
 
-app.get("/", (req, res) => {
-  res.json({
-    service: "multiplayer-service",
-    status: "running"
+  app.get("/", (req, res) => {
+    res.json({
+      service: "multiplayer-service",
+      status: "running"
+    });
   });
-});
 
-app.get("/health", (req, res) => {
-  res.json({
-    service: "multiplayer-service",
-    status: "ok"
+  app.get("/health", (req, res) => {
+    res.json({
+      service: "multiplayer-service",
+      status: "ok"
+    });
   });
-});
 
-const httpServer = http.createServer(app);
+  const server = http.createServer(app);
 
-const io = new Server(httpServer, {
-  cors: {
-    origin: FRONTEND_URL,
-    methods: ["GET", "POST"],
-    credentials: true
-  },
-  transports: ["websocket", "polling"]
-});
+  const io = new Server(server, {
+    cors: {
+      origin: FRONTEND_URL,
+      methods: ["GET", "POST"],
+      credentials: true
+    },
+    transports: ["websocket", "polling"]
+  });
 
-initMultiplayerSocket(io);
+  initMultiplayerSocket(io);
 
-const PORT = process.env.PORT || 4000;
+  return { app, server, io };
+}
 
-httpServer.listen(PORT, () => {
-  console.log(`multiplayer-service activo en http://localhost:${PORT}`);
-  console.log(`Origen permitido por CORS: ${FRONTEND_URL}`);
-});
+if (require.main === module) {
+  const { server } = createServer();
+  const PORT = process.env.PORT || 4000;
+
+  server.listen(PORT, () => {
+    console.log(`multiplayer-service activo en http://localhost:${PORT}`);
+    console.log(`Origen permitido por CORS: ${process.env.FRONTEND_URL || "http://localhost:5173"}`);
+  });
+}
+
+module.exports = {
+  createServer
+};
