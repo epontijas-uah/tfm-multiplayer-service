@@ -41,19 +41,20 @@ jobs:
         run: docker build -t multiplayer-service:${{ github.sha }} .
 
       - name: Run Docker container
-        shell: bash
+        shell: powershell
         run: |
-          docker rm -f multiplayer-service >/dev/null 2>&1 || true
+          $null = docker rm -f multiplayer-service 2>$null
           docker run -d --name multiplayer-service -p 4000:4000 multiplayer-service:${{ github.sha }}
 
       - name: Verify deployment
-        shell: bash
+        shell: powershell
         run: |
-          for i in $(seq 1 15); do
-            if curl -fsS http://127.0.0.1:4000/health; then
-              exit 0
-            fi
-            sleep 2
-          done
+          for ($i = 1; $i -le 15; $i++) {
+            try {
+              $response = Invoke-WebRequest -Uri "http://127.0.0.1:4000/health" -UseBasicParsing -TimeoutSec 5
+              if ($response.StatusCode -eq 200) { exit 0 }
+            } catch {}
+            Start-Sleep -Seconds 2
+          }
           docker logs multiplayer-service
           exit 1
