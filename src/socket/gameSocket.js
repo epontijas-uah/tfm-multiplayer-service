@@ -69,16 +69,21 @@ function initMultiplayerSocket(io) {
         rooms[roomId] = [];
       }
 
-      const alreadyInRoom = rooms[roomId].some(
+      const existingPlayerIndex = rooms[roomId].findIndex(
         (player) => player.socketId === socket.id
       );
 
-      if (!alreadyInRoom) {
-        rooms[roomId].push({
-          socketId: socket.id,
-          id: socket.user.id,
-          username: socket.user.username
-        });
+      const playerData = {
+        socketId: socket.id,
+        id: socket.user.id,
+        username: socket.user.username,
+        ready: false,
+      };
+
+      if (existingPlayerIndex !== -1) {
+        rooms[roomId][existingPlayerIndex] = playerData;
+      } else {
+        rooms[roomId].push(playerData);
       }
 
       console.log(`${socket.user.username} se unió a sala: ${roomId}`);
@@ -115,16 +120,50 @@ function initMultiplayerSocket(io) {
       });
     });
 
-    socket.on("player_move", ({ roomId, position }) => {
-      if (!roomId || !position) return;
+    socket.on("player_ready", ({ roomId, playerId }) => {
+      if (!roomId || playerId === undefined) return;
+      if (!rooms[roomId]) return;
 
-      socket.to(roomId).emit("player_moved", {
-        player: {
-          id: socket.user.id,
-          username: socket.user.username
-        },
-        position
+      const player = rooms[roomId].find((item) => item.socketId === socket.id);
+      if (!player) return;
+
+      player.ready = true;
+      io.to(roomId).emit("room_update", rooms[roomId]);
+
+      const allReady = rooms[roomId].length > 0 && rooms[roomId].every((item) => item.ready);
+      if (allReady) {
+        io.to(roomId).emit("game_started");
+      }
+    });
+
+    socket.on("player_move", ({ roomId, playerId, state }) => {
+      if (!roomId || !state || playerId === undefined) return;
+
+      socket.to(roomId).emit("player_move", {
+        playerId,
+        state
       });
+    });
+
+    socket.on("game_finished", ({ roomId, playerId, results }) => {
+      if (!roomId || playerId === undefined || !results) return;
+
+      socket.to(roomId).emit("game_finished", {
+        playerId,
+        results
+      });
+    });
+
+    socket.on("restart_game", ({ roomId }) => {
+      if (!roomId) return;
+
+      if (rooms[roomId]) {
+        rooms[roomId].forEach((player) => {
+          player.ready = false;
+        });
+      }
+
+      io.to(roomId).emit("restart_game");
     });
 
     socket.on("disconnect", () => {
